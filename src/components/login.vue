@@ -6,13 +6,23 @@
           v-model="username"
           placeholder="Username"
           @keyup.enter="login"
+          :disabled="isLoading"
       />
       <input
           v-model="totpCode"
           placeholder="TOTP Code"
           @keyup.enter="login"
+          :disabled="isLoading"
       />
-      <button @click="login">Login</button>
+      <input
+          v-model="backendUrl"
+          placeholder="Backend URL"
+          @keyup.enter="login"
+          :disabled="isLoading"
+      />
+      <button @click="login" :disabled="isLoading">
+        {{ isLoading ? 'Logging in...' : 'Login' }}
+      </button>
 
       <div class="register-info">
         <p>Need an account?</p>
@@ -32,6 +42,16 @@
         <button @click="showModal = false">Close</button>
       </div>
     </div>
+
+    <!-- 登录失败模态框 -->
+    <div v-if="showLoginErrorModal" class="modal">
+      <div class="modal-content">
+        <span class="close" @click="showLoginErrorModal = false">&times;</span>
+        <h3>Login Failed</h3>
+        <p>{{ loginErrorMessage }}</p>
+        <button @click="showLoginErrorModal = false">Close</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -44,29 +64,46 @@ export default {
     return {
       username: '',
       totpCode: '',
-      showModal: false
+      backendUrl: 'http://localhost:8000', // 默认后端URL
+      showModal: false,
+      showLoginErrorModal: false,
+      loginErrorMessage: '',
+      isLoading: false
     }
   },
   methods: {
     async login() {
       // 验证输入
-      if (!this.username || !this.totpCode) {
-        alert('Please enter username and TOTP code')
+      if (!this.username || !this.totpCode || !this.backendUrl) {
+        this.loginErrorMessage = 'Please enter username, TOTP code and backend URL'
+        this.showLoginErrorModal = true
         return
       }
 
+      this.isLoading = true
       try {
-        const response = await axios.post('http://localhost:8000/login', {
+        const response = await axios.post(`${this.backendUrl}/login`, {
           username: this.username,
           totp_code: this.totpCode
+        }, {
+          timeout: 5000 // 设置后端 URL 5 秒超时
         })
 
+        // 将 backendUrl 写入 cookie，有效期 7 天
+        document.cookie = `backendUrl=${this.backendUrl};max-age=604800;path=/`
+        
         // 登录成功
         this.$emit('login-success')
-        alert('Login successful')
       } catch (error) {
         console.error('Login error:', error)
-        alert(error.response?.data?.detail || 'Login failed')
+        if (error.code === 'ECONNABORTED') {
+          this.loginErrorMessage = 'Backend URL timeout. Please check it.'
+        } else {
+          this.loginErrorMessage = error.response?.data?.detail || 'Login failed'
+        }
+        this.showLoginErrorModal = true
+      } finally {
+        this.isLoading = false
       }
     },
     showRegisterInfo() {
@@ -101,6 +138,11 @@ input {
   box-sizing: border-box;
 }
 
+input:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
 button {
   padding: 10px;
   background-color: #4CAF50;
@@ -113,6 +155,11 @@ button {
 
 button:hover {
   background-color: #45a049;
+}
+
+button:disabled {
+  background-color: #cccccc;
+  cursor: not-allowed;
 }
 
 .register-info {

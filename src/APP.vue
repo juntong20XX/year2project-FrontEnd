@@ -6,7 +6,7 @@
 </template>
 
 <script>
-import Login from './components/Login.vue'
+import Login from './components/login.vue'
 import ItemList from './components/control-page.vue'
 
 export default {
@@ -20,11 +20,24 @@ export default {
       isLoggedIn: false
     }
   },
+  mounted() {
+    // 检查 cookie 中是否存在 backendUrl
+    const cookies = document.cookie.split(';')
+    for (let cookie of cookies) {
+      const [name, value] = cookie.trim().split('=')
+      if (name === 'backendUrl' && value) {
+        this.isLoggedIn = true
+        break
+      }
+    }
+  },
   methods: {
     handleLoginSuccess() {
       this.isLoggedIn = true
     },
     handleLogout() {
+      // 登出时清除 cookie
+      document.cookie = 'backendUrl=;max-age=0;path=/'
       this.isLoggedIn = false
     }
   }
