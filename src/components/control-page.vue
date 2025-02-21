@@ -73,6 +73,19 @@
         <button class="error-btn" @click="showRangeErrorModal = false">Close</button>
       </div>
     </div>
+
+    <!-- Backend Error Modal -->
+    <div v-if="showBackendErrorModal" class="modal">
+      <div class="modal-content">
+        <span class="close" @click="showBackendErrorModal = false">&times;</span>
+        <h3>Connection Error</h3>
+        <p>Unable to connect to backend server</p>
+        <div class="modal-buttons">
+          <button @click="retryConnection">Retry Connection</button>
+          <button class="error-btn" @click="logout">Logout</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -89,6 +102,7 @@ export default {
       showSuccessModal: false,
       showRemovedItemModal: false,
       showRangeErrorModal: false,
+      showBackendErrorModal: false,
       updateInterval: null,
       focusedInputKey: null
     }
@@ -105,17 +119,24 @@ export default {
     }
     this.fetchItems()
     // 每秒更新数据
-    this.updateInterval = setInterval(() => {
-      this.fetchItems()
-    }, 1000)
+    this.startUpdateInterval()
   },
   beforeDestroy() {
     // 组件销毁前清除定时器
-    if (this.updateInterval) {
-      clearInterval(this.updateInterval)
-    }
+    this.stopUpdateInterval()
   },
   methods: {
+    startUpdateInterval() {
+      this.updateInterval = setInterval(() => {
+        this.fetchItems()
+      }, 1000)
+    },
+    stopUpdateInterval() {
+      if (this.updateInterval) {
+        clearInterval(this.updateInterval)
+        this.updateInterval = null
+      }
+    },
     async fetchItems() {
       try {
         const response = await axios.get(`${this.backendUrl}/items`)
@@ -142,9 +163,20 @@ export default {
 
         this.previousItems = this.items
         this.items = newItems
+        
+        // 如果成功连接，确保错误模态框关闭
+        this.showBackendErrorModal = false
       } catch (error) {
         console.error('Error fetching items:', error)
-        this.handleError(error)
+        if (error.response?.status === 404 || !error.response) {
+          this.stopUpdateInterval()
+          this.showBackendErrorModal = true
+          // 清空列表
+          this.items = []
+          this.previousItems = []
+        } else {
+          this.handleError(error)
+        }
       }
     },
     async updateItem(item) {
@@ -162,7 +194,15 @@ export default {
         this.showSuccessModal = true
       } catch (error) {
         console.error('Error updating item:', error)
-        this.handleError(error)
+        if (error.response?.status === 404 || !error.response) {
+          this.stopUpdateInterval()
+          this.showBackendErrorModal = true
+          // 清空列表
+          this.items = []
+          this.previousItems = []
+        } else {
+          this.handleError(error)
+        }
       }
     },
     markFocusedInput(key) {
@@ -176,10 +216,7 @@ export default {
       alert(errorMessage)
     },
     logout() {
-      // 登出时清除定时器
-      if (this.updateInterval) {
-        clearInterval(this.updateInterval)
-      }
+      this.stopUpdateInterval()
       this.$emit('logout')
     },
     getRealValue(key) {
@@ -191,6 +228,11 @@ export default {
       if (realValue !== null) {
         item.value = realValue
       }
+    },
+    retryConnection() {
+      this.showBackendErrorModal = false
+      this.fetchItems()
+      this.startUpdateInterval()
     }
   }
 }
