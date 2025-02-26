@@ -1,14 +1,14 @@
 <template>
   <div class="item-list">
     <div class="header">
-      <h1>Joints</h1>
+      <h1>Modules</h1>
       <button class="logout-btn" @click="logout">Logout</button>
     </div>
     <table>
       <thead>
       <tr>
         <th>Name</th>
-        <th>Degree</th>
+        <th>Sensor</th>
         <th>Action</th>
       </tr>
       </thead>
